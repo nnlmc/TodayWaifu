@@ -355,7 +355,13 @@ async def _ensure_daily_wife_record(ev: Event, user_id: str | int | None = None)
     return record
 
 
-async def _send_role_image(bot: Bot, role: RoleCandidate, image_url: str, text: str | None = None) -> None:
+async def _send_role_image(
+    bot: Bot,
+    role: RoleCandidate,
+    image_url: str,
+    text: str | None = None,
+    user_id: str | int | None = None,
+) -> None:
     try:
         image = await _download_image(image_url)
     except RuntimeError as exc:
@@ -363,10 +369,13 @@ async def _send_role_image(bot: Bot, role: RoleCandidate, image_url: str, text: 
         await bot.send(str(exc))
         return
 
+    messages: list[Any] = []
+    if user_id is not None and bool(_cfg('DailyWifeAtUser')):
+        messages.append(MessageSegment.at(user_id))
     if text:
-        await bot.send([text, MessageSegment.image(image)])
-    else:
-        await bot.send(MessageSegment.image(image))
+        messages.append(text)
+    messages.append(MessageSegment.image(image))
+    await bot.send(messages if len(messages) > 1 else messages[0])
 
 
 async def _send_daily_wife(bot: Bot, ev: Event):
@@ -392,7 +401,7 @@ async def _send_daily_wife(bot: Bot, ev: Event):
     )
 
     text = _build_text(role) if bool(_cfg('DailyWifeSendText')) else None
-    await _send_role_image(bot, role, image, text)
+    await _send_role_image(bot, role, image, text, ev.user_id)
 
 
 async def _send_rob_wife(bot: Bot, ev: Event):
@@ -428,7 +437,7 @@ async def _send_rob_wife(bot: Bot, ev: Event):
     role = target_record.to_role()
     text = _build_rob_success_text(role, target_user_id)
     if bool(_cfg('DailyWifeSendText')):
-        await _send_role_image(bot, role, target_record.image, text)
+        await _send_role_image(bot, role, target_record.image, text, robber_id)
     else:
         await bot.send(text)
 

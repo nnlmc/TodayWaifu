@@ -42,6 +42,7 @@ gs_wuwa_daily_wife
 - `DailyWifeGalleryUsername`：画廊账号；
 - `DailyWifeGalleryPassword`：画廊密码；
 - `DailyWifeSendText`：是否发送“你今天的老婆是xxx”；
+- `DailyWifeAtUser`：发送今日老婆和抢老婆成功图片时是否艾特对应用户；
 - `DailyWifeShowRoleId`：是否显示角色 ID；
 - `DailyWifeTextTemplate`：文字模板，可用变量 `{name}`、`{role_id}`；
 - `DailyWifeMasterUnlimited`：主人无限抽老婆，开启后 GSCore 主人不会固定当天结果；

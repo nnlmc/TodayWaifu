@@ -29,6 +29,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后图片前附带“你今天的老婆是xxx”',
         True,
     ),
+    'DailyWifeAtUser': GsBoolConfig(
+        '发送时艾特触发者',
+        '开启后发送今日老婆和抢老婆成功图片时会艾特对应用户',
+        True,
+    ),
     'DailyWifeShowRoleId': GsBoolConfig(
         '显示角色 ID',
         '开启后在文字说明里额外显示本次角色对应的数字 ID',
