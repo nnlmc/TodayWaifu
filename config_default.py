@@ -9,14 +9,19 @@ from gsuid_core.utils.plugins_config.models import (
 )
 
 CONFIG_DEFAULT: Dict[str, GSC] = {
-    'DailyWifeCustomRolePilePath': GsStrConfig(
-        '角色图片目录',
-        '留空时自动查找 gsuid_core/data/XutheringWavesUID/custom_role_pile；也可以手动填写绝对路径',
+    'DailyWifeGalleryApiUrl': GsStrConfig(
+        '画廊接口地址',
+        'XWUID 画廊角色立绘接口地址，默认使用 https://img.xlinxc.cn/api/xwuid/roles',
+        'https://img.xlinxc.cn/api/xwuid/roles',
+    ),
+    'DailyWifeGalleryUsername': GsStrConfig(
+        '画廊账号',
+        '访问 XWUID 画廊接口和图片所需的账号',
         '',
     ),
-    'DailyWifeRoleMapPath': GsStrConfig(
-        '角色 ID 对照表路径',
-        '留空时优先使用插件内置 role_id_map.txt；也可以手动填写自己的对照表路径',
+    'DailyWifeGalleryPassword': GsStrConfig(
+        '画廊密码',
+        '访问 XWUID 画廊接口和图片所需的密码',
         '',
     ),
     'DailyWifeSendText': GsBoolConfig(
@@ -34,19 +39,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '可用变量：{name} 角色名，{role_id} 数字 ID',
         '你今天的老婆是{name}',
     ),
-    # 抽群友相关配置已按要求注释停用，保留以便之后恢复。
-    # 'DailyWifeEnableGroupMember': GsBoolConfig(
-    #     '启用群成员老婆',
-    #     '开启后，群聊触发今日老婆时有概率抽到本群已记录成员；关闭后只抽鸣潮角色',
-    #     False,
-    # ),
-    # 'DailyWifeGroupMemberProbability': GsFloatConfig(
-    #     '群成员抽取概率',
-    #     '启用群成员老婆后生效，范围 0~1，例如 0.1 表示 10% 概率抽到群成员',
-    #     0.1,
-    #     0.0,
-    #     1.0,
-    # ),
     'DailyWifeMasterUnlimited': GsBoolConfig(
         '主人无限抽老婆',
         '开启后，GSCore 主人触发今日老婆时不再按每日固定结果，可重复随机抽取',
@@ -62,14 +54,4 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 被抢用户 ID',
         '抢老婆成功！你把对方今天的老婆{name}抢过来了！',
     ),
-    # 'DailyWifeOneBotApiUrl': GsStrConfig(
-    #     'OneBot HTTP API 地址',
-    #     '用于直抓群成员列表，留空则只使用 GSCore 成员缓存；例如 http://127.0.0.1:3000',
-    #     '',
-    # ),
-    # 'DailyWifeOneBotAccessToken': GsStrConfig(
-    #     'OneBot HTTP API Token',
-    #     'OneBot HTTP API 的 access_token，没有则留空',
-    #     '',
-    # ),
 }
