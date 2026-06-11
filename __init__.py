@@ -357,24 +357,32 @@ def _record_from_dict(data: dict[str, Any]) -> WifeRecord | None:
 
 
 def _get_event_target_user_id(ev: Event) -> str | None:
-    at_list = getattr(ev, 'at_list', None)
-    if at_list:
-        value = next(iter(at_list), None)
-        if value:
-            return str(value)
-
-    for attr in ('at', 'target_id', 'target_user_id'):
+    for attr in ('at_list', 'at', 'target_id', 'target_user_id'):
         value = getattr(ev, attr, None)
-        if value:
+        if value is not None:
             if isinstance(value, (list, tuple, set)):
                 value = next(iter(value), None)
-            if value:
-                return str(value)
 
-    raw_text = str(getattr(ev, 'text', '') or getattr(ev, 'raw_text', '') or '').strip()
-    match = re.search(r'(?:@|qq=|qq:|QQ=|QQ:)?(\d{5,20})', raw_text)
-    if match:
-        return match.group(1)
+            if isinstance(value, bool):
+                continue
+            
+            v_str = str(value).strip()
+            if v_str and v_str.lower() not in ('none', 'true', 'false', 'all'):
+                match = re.search(r'(\d{5,20})', v_str)
+                if match:
+                    return match.group(1)
+                if 'CQ:at' not in v_str and '<at' not in v_str:
+                    return v_str
+
+    for attr in ('text', 'raw_text', 'raw_message', 'message', 'original_message'):
+        t = getattr(ev, attr, None)
+        if t is not None:
+            t_str = str(t).strip()
+            if t_str:
+                match = re.search(r'(?:@|qq=|qq:|QQ=|QQ:)?(\d{5,20})', t_str)
+                if match:
+                    return match.group(1)
+
     return None
 
 
