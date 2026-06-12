@@ -730,6 +730,7 @@ async def _send_role_image(
     messages: list[Any] = []
     if user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
+        messages.append('\n')
     if text:
         messages.append(text)
     messages.append(MessageSegment.image(image))
