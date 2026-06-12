@@ -485,7 +485,12 @@ async def _wife_list_text(ev: Event) -> str:
             order = int(updated_at)
         except (TypeError, ValueError):
             order = 0
-        items.append((order, display_name, record.name))
+        if raw_record.get('stolen_by'):
+            wife_name = '被抢走了~'
+        else:
+            wife_name = record.name
+
+        items.append((order, display_name, wife_name))
 
     if not items:
         return '今天本群还没有可用的老婆记录。'
@@ -495,7 +500,7 @@ async def _wife_list_text(ev: Event) -> str:
 
     items.sort(key=lambda item: (item[0], item[1]))
     lines = ['今日老婆列表：']
-    lines.extend(f'{index}.{display_name}今天的老婆是{wife_name}' for index, (_, display_name, wife_name) in enumerate(items, 1))
+    lines.extend(f'{index}. {display_name} → {wife_name}' for index, (_, display_name, wife_name) in enumerate(items, 1))
     return '\n'.join(lines)
 
 
@@ -523,6 +528,17 @@ async def _send_role_image(
 
 
 async def _send_daily_wife(bot: Bot, ev: Event):
+    if not (bool(_cfg('DailyWifeMasterUnlimited')) and _is_master(ev)):
+        data = _load_wife_data()
+        context = _get_today_context(data, ev)
+        user_key = _user_key(ev)
+        current_record = context['wives'].get(user_key)
+        
+        if isinstance(current_record, dict) and current_record.get('stolen_by'):
+            wife_name = current_record.get('name', '老婆')
+            stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
+            return await bot.send(f'你的{wife_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
+
     candidates, error = await _load_candidates()
     if error or not candidates:
         return await bot.send(error or '没有找到可用角色。')
@@ -564,7 +580,7 @@ async def _send_rob_wife(bot: Bot, ev: Event):
 
     target_record = _get_existing_daily_wife_record(ev, target_user_id)
     if target_record is None:
-        return await bot.send('对方今天还没有在当前群发送今日老婆，暂时抢不到他的老婆。')
+        return await bot.send('对方今天还没有老婆呢~')
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
@@ -582,6 +598,12 @@ async def _send_rob_wife(bot: Bot, ev: Event):
 
     context['wives'][robber_id] = _record_to_dict(target_record, ev, robber_id)
     context['wives'][robber_id]['stolen_from'] = target_user_id
+
+    robber_name = _user_display_name(ev, robber_id)
+    if isinstance(context['wives'].get(target_user_id), dict):
+        context['wives'][target_user_id]['stolen_by'] = robber_id
+        context['wives'][target_user_id]['stolen_by_name'] = robber_name
+
     _save_wife_data(data)
 
     role = target_record.to_role()
