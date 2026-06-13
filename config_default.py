@@ -34,6 +34,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后在文字说明里额外显示本次角色对应的数字 ID',
         False,
     ),
+    'DailyWifeDebugMode': GsBoolConfig(
+        'Debug模式',
+        '开启后主人可无限次抽取、指定角色（命令：今日老婆 [角色名]），且不计入今日老婆列表',
+        False,
+    ),
     'DailyWifeTextTemplate': GsStrConfig(
         '文字模板',
         '可用变量：{name} 角色名，{role_id} 数字 ID',
