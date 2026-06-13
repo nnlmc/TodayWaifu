@@ -903,7 +903,6 @@ async def _send_record_image(
     hint = '本地群友头像文件不存在，请稍后重试。' if record.record_type == 'member' else '本地图片文件不存在，请检查 custom_role_pile 目录。'
     await _send_local_image(bot, record.image, hint, text, user_id)
 
-
 async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = ''):
     title = '老公' if mode == 'husband' else '老婆'
     
@@ -983,6 +982,18 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             f'[gs_wuwa_daily_wife] mode={mode} user={ev.user_id} group={ev.group_id or "direct"} '
             f'role={role.name} ids={role.role_ids} image={record.image} debug={is_debug_active}'
         )
+await _send_record_image(bot, record, mode, ev.user_id)
+
+
+async def _send_group_member_wife(bot: Bot, ev: Event):
+    if not _marry_member_enabled():
+        return await bot.send('娶群友功能当前已关闭。')
+    if not ev.group_id:
+        return await bot.send('这个命令只能在群聊里使用。')
+
+    member = await _pick_group_member(ev, _event_rng(ev))
+    if member is None:
+        return await bot.send('没有获取到本群成员，暂时娶不到群友。')
 
     await _send_record_image(bot, record, mode, ev.user_id)
 
