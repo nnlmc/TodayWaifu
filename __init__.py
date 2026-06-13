@@ -165,6 +165,26 @@ def _resolve_role_pile_root() -> Path | None:
             return path
     return None
 
+def _resolve_default_role_pile_root() -> Path | None:
+    '''定位默认的角色立绘目录 role_pile：自动查找。'''
+    candidates = [
+        Path.cwd() / 'gsuid_core' / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile',
+        Path.cwd() / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile',
+        BASE_DIR.parent / 'gsuid_core' / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile',
+        BASE_DIR.parent / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile',
+    ]
+
+    try:
+        import gsuid_core
+        core_root = Path(gsuid_core.__file__).resolve().parents[1]
+        candidates.append(core_root / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile')
+    except Exception:
+        pass
+
+    for path in candidates:
+        if path and path.is_dir():
+            return path
+    return None
 
 def _load_role_map(path: Path) -> dict[str, str]:
     '''解析「ID：角色名」格式的对照表。'''
@@ -190,19 +210,33 @@ def _role_images(role_dir: Path) -> tuple[str, ...]:
     return tuple(str(path) for path in sorted(images, key=lambda path: str(path).lower()))
 
 
-def _collect_role_candidates(role_map: dict[str, str], pile_root: Path) -> tuple[RoleCandidate, ...]:
-    '''按对照表把本地目录里的图片归并成角色候选。'''
+def _collect_role_candidates(role_map: dict[str, str], pile_root: Path, default_pile_root: Path | None) -> tuple[RoleCandidate, ...]:
+    '''按对照表把本地目录里的图片归并成角色候选，支持回退到默认面板图。'''
     grouped: dict[str, dict[str, list[Any]]] = {}
     for role_id in sorted(role_map.keys(), key=lambda item: int(item) if item.isdigit() else item):
         role_name = role_map[role_id]
         if _is_excluded_role(role_name):
             continue
+        
+        images: list[str] = []
+        
+        # 1. 尝试从自定义目录获取
         role_dir = pile_root / role_id
-        if not role_dir.is_dir():
-            continue
-        images = _role_images(role_dir)
+        if role_dir.is_dir():
+            images = list(_role_images(role_dir))
+            
+        # 2. 如果自定义目录没有图片，且存在默认面板目录，尝试获取默认图片
+        if not images and default_pile_root and default_pile_root.is_dir():
+            # 遍历支持的扩展名，匹配 role_pile_{role_id}.ext
+            for ext in IMAGE_EXTENSIONS:
+                fallback_img = default_pile_root / f'role_pile_{role_id}{ext}'
+                if fallback_img.is_file():
+                    images.append(str(fallback_img))
+                    break  # 找到一张默认图即可
+
         if not images:
             continue
+
         bucket = grouped.setdefault(role_name, {'role_ids': [], 'images': []})
         bucket['role_ids'].append(role_id)
         bucket['images'].extend(images)
@@ -226,18 +260,24 @@ def _load_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | No
         return None, '没有找到鸣潮角色 ID 对照表。'
 
     pile_root = _resolve_role_pile_root()
+    default_pile_root = _resolve_default_role_pile_root()
+    
+    if pile_root is None and default_pile_root is None:
+        return None, '没有找到 custom_role_pile 或默认 role_pile 图片目录。'
+        
+    # 如果没找到自定义目录，给个假路径防止 pathlib 报错，全靠默认目录兜底
     if pile_root is None:
-        return None, '没有找到 custom_role_pile 图片目录。'
+        pile_root = Path("dummy_non_existent_path")
 
     try:
         role_map = _load_role_map(role_map_path)
-        candidates = _collect_role_candidates(role_map, pile_root)
+        candidates = _collect_role_candidates(role_map, pile_root, default_pile_root)
     except Exception as exc:
         logger.warning(f'[gs_wuwa_daily_wife] 读取本地图片目录失败: {exc}')
         return None, '读取本地图片目录失败。'
 
     if not candidates:
-        return None, 'custom_role_pile 里没有找到可用角色图片。'
+        return None, '图片目录里没有找到可用角色图片。'
     return candidates, None
 
 
