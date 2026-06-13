@@ -904,11 +904,15 @@ async def _send_record_image(
     await _send_local_image(bot, record.image, hint, text, user_id)
 
 
-async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife'):
+async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = ''):
     title = '老公' if mode == 'husband' else '老婆'
-    salt = 'husband' if mode == 'husband' else ''
-    # 老婆模式下，若今天的老婆已被抢走，则不再补抽（老公模式没有抢夺概念）
-    if mode == 'wife' and not (bool(_cfg('DailyWifeMasterUnlimited')) and _is_master(ev)):
+    
+    is_master = _is_master(ev)
+    is_debug = _cfg_bool('DailyWifeDebugMode', False)
+    is_debug_active = is_debug and is_master
+
+    # 老婆模式下，若今天的老婆已被抢走，且不处于无限抽或Debug模式，则不再补抽
+    if mode == 'wife' and not is_debug_active and not (bool(_cfg('DailyWifeMasterUnlimited')) and is_master):
         data = _load_wife_data()
         context = _get_today_context(data, ev)
         user_key = _user_key(ev)
@@ -919,42 +923,65 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife'):
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
             return await bot.send(f'你的{wife_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
 
-    if bool(_cfg('DailyWifeMasterUnlimited')) and _is_master(ev):
-        rng = random.Random()
-        record: WifeRecord | None = None
-        if mode == 'wife':
-            record = await _roll_group_member_wife(ev, rng=rng)
+    candidates, error = await _load_candidates()
+    if error or not candidates:
+        return await bot.send(error or '没有找到可用角色。')
 
-        if record is None:
-            candidates, error = await _load_candidates()
-            if error or not candidates:
-                return await bot.send(error or '没有找到可用角色。')
+    candidates = _filter_by_mode(candidates, mode)
+    if not candidates:
+        return await bot.send(f'没有找到可用的{title}角色。')
 
-            candidates = _filter_by_mode(candidates, mode)
-            if not candidates:
+    record: WifeRecord | None = None
+
+    # Debug 模式（主人专享）：无限抽、可指定、不计入记录
+    if is_debug_active:
+        if specified_name:
+            target_candidates = [c for c in candidates if c.name == specified_name]
+            if not target_candidates:
+                return await bot.send(f'未找到名为“{specified_name}”的{title}角色。')
+            role = target_candidates[0]
+        else:
+            role = random.choice(candidates)
+            
+        image = random.choice(role.images)
+        record = WifeRecord.from_role(role, image)
+        # ⚠️ 注意：此处故意跳过 _save_daily_wife_record 调用，实现“不计入列表”
+    else:
+        # 拦截普通用户的指定请求
+        if specified_name:
+            return await bot.send(f'只有在 Debug 模式下主人才能指定{title}哦。')
+
+        # 普通逻辑或 MasterUnlimited 逻辑
+        if bool(_cfg('DailyWifeMasterUnlimited')) and is_master:
+            rng = random.Random()
+            if mode == 'wife':
+                record = await _roll_group_member_wife(ev, rng=rng)
+            
+            # 若未抽到群友，则回退到抽取角色
+            if record is None:
+                role = rng.choice(candidates)
+                image = rng.choice(role.images)
+                record = WifeRecord.from_role(role, image)
+        else:
+            record = await _ensure_daily_wife_record(ev, mode=mode)
+            if record is None:
                 return await bot.send(f'没有找到可用的{title}角色。')
 
-            role = rng.choice(candidates)
-            image = rng.choice(role.images)
-            record = WifeRecord.from_role(role, image)
-    else:
-        record = await _ensure_daily_wife_record(ev, mode=mode)
-        if record is None:
-            return await bot.send(f'没有找到可用的{title}角色。')
+        # 正常模式下必须保存记录
+        _save_daily_wife_record(ev, record, mode=mode)
 
-    _save_daily_wife_record(ev, record, mode=mode)
-
+    # 兼容处理群友(member)和角色(role)的不同日志记录格式
     if record.record_type == 'member':
         member = record.to_member()
         logger.info(
             f'[gs_wuwa_daily_wife] mode={mode} user={ev.user_id} group={ev.group_id or "direct"} '
-            f'member={member.name} qq={member.user_id} avatar={record.image}'
+            f'member={member.name} qq={member.user_id} avatar={record.image} debug={is_debug_active}'
         )
     else:
         role = record.to_role()
         logger.info(
             f'[gs_wuwa_daily_wife] mode={mode} user={ev.user_id} group={ev.group_id or "direct"} '
-            f'role={role.name} ids={role.role_ids} image={record.image}'
+            f'role={role.name} ids={role.role_ids} image={record.image} debug={is_debug_active}'
         )
 
     await _send_record_image(bot, record, mode, ev.user_id)
@@ -1029,9 +1056,10 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     await bot.send(await _wife_list_text(ev, mode))
 
 
-@sv.on_fullmatch('今日老婆', block=True)
+@sv.on_prefix('今日老婆', block=True)
 async def daily_wife(bot: Bot, ev: Event):
-    await _send_daily_wife(bot, ev)
+    specified_name = ev.text.strip()
+    await _send_daily_wife(bot, ev, mode='wife', specified_name=specified_name)
 
 
 @sv.on_fullmatch(('老婆列表', '今日老婆列表'), block=True)
@@ -1039,11 +1067,12 @@ async def daily_wife_list(bot: Bot, ev: Event):
     await _send_wife_list(bot, ev)
 
 
-@sv.on_fullmatch('今日老公', block=True)
+@sv.on_prefix('今日老公', block=True)
 async def daily_husband(bot: Bot, ev: Event):
     if not _husband_enabled():
         return await bot.send('今日老公功能当前已关闭。')
-    await _send_daily_wife(bot, ev, mode='husband')
+    specified_name = ev.text.strip()
+    await _send_daily_wife(bot, ev, mode='husband', specified_name=specified_name)
 
 
 @sv.on_fullmatch(('老公列表', '今日老公列表'), block=True)
