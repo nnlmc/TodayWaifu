@@ -259,10 +259,10 @@ group_member_avatar_cache/{user_id}.jpg
 插件会自动：
 
 - 分配一个 `900001` 起步的数字角色 ID；
-- 在插件自己的 `data/custom_role_pile/` 下创建对应数字文件夹；
-- 把 `角色ID：角色名` 写入插件自己的 `data/custom_role_map.txt`。
+- 在 GSCore / 早柚核心的 `data/gs_wuwa_daily_wife/custom_role_pile/` 下创建对应数字文件夹；
+- 把 `角色ID：角色名` 写入 GSCore / 早柚核心的 `data/gs_wuwa_daily_wife/custom_role_map.txt`。
 
-这些自定义老婆图片不会写进 XWUID 的 `custom_role_pile`，避免和 XWUID 面板图冲突。
+这些自定义老婆图片不会写进 XWUID 的 `custom_role_pile`，而是写进 GSCore / 早柚核心 `data/gs_wuwa_daily_wife/`，避免和 XWUID 面板图冲突。
 
 然后发送图片并带命令：
 
@@ -300,7 +300,7 @@ group_member_avatar_cache/{user_id}.jpg
 老婆删除达妮娅
 ```
 
-这个命令会删除该角色在插件 `data/` 下的全部自定义图片和映射，需要二次确认。发起后按提示发送：
+这个命令会删除该角色在 GSCore / 早柚核心 `data/gs_wuwa_daily_wife/` 下的全部自定义图片和映射，需要二次确认。发起后按提示发送：
 
 ```text
 老婆删除确认

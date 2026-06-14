@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 from gsuid_core.bot import Bot
 from gsuid_core.config import core_config
+from gsuid_core.data_store import get_res_path
 from gsuid_core.logger import logger
 from gsuid_core.models import Event, Message
 from gsuid_core.segment import MessageSegment
@@ -206,7 +207,7 @@ def _resolve_role_map_path() -> Path | None:
 
 
 def _custom_upload_data_root() -> Path:
-    return BASE_DIR / 'data'
+    return get_res_path('gs_wuwa_daily_wife')
 
 
 def _custom_upload_role_map_path() -> Path:
@@ -612,7 +613,7 @@ def _collect_role_candidates(
 
         images: list[str] = []
 
-        # 1. 优先读取本插件 data 下的自定义老婆图片，避免和 XWUID 自定义面板图目录混在一起
+        # 1. 优先读取 GSCore data 下本插件的自定义老婆图片，避免和 XWUID 自定义面板图目录混在一起
         if upload_pile_root and upload_pile_root.is_dir():
             upload_role_dir = upload_pile_root / role_id
             if upload_role_dir.is_dir():
