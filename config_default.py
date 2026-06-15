@@ -5,6 +5,7 @@ from typing import Dict
 from gsuid_core.utils.plugins_config.models import (
     GSC,
     GsBoolConfig,
+    GsIntConfig,
     GsStrConfig,
 )
 
@@ -128,5 +129,20 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '送老婆成功提示',
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 接收方用户 ID',
         '你把今天的老婆{name}送给了对方！',
+    ),
+    'DailyWifeUpdateLogEnabled': GsBoolConfig(
+        '启用老婆更新记录',
+        '开启后可使用「老婆更新记录」命令，实时获取 GitHub 更新记录并渲染成图片',
+        True,
+    ),
+    'DailyWifeUpdateLogApiUrl': GsStrConfig(
+        '老婆更新记录接口',
+        'GitHub commits API 地址，默认读取 nnlmc/TodayWaifu 最近更新记录',
+        'https://api.github.com/repos/nnlmc/TodayWaifu/commits?per_page=30',
+    ),
+    'DailyWifeUpdateLogLimit': GsIntConfig(
+        '老婆更新记录数量',
+        '单次渲染最近多少条 GitHub 更新记录，建议 3-12 条',
+        6,
     ),
 }
