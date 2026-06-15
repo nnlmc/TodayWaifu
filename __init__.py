@@ -1632,7 +1632,10 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
 
     image = random.choice(images)
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，发送图片: {image}')
-    await bot.send(MessageSegment.image(image))
+    await bot.send([
+        _with_loli_reply_prefix('你今天的萝莉是'),
+        MessageSegment.image(image),
+    ])
 
 
 async def _send_download_loli_images(bot: Bot, ev: Event) -> None:
