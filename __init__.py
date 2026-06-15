@@ -9,6 +9,7 @@ import random
 import re
 import shutil
 import time
+import zipfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -44,10 +45,29 @@ LIST_FORWARD_THRESHOLD = 10
 CUSTOM_ROLE_ID_START = 900001
 UPLOAD_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 CUSTOM_ROLE_DELETE_CONFIRM_SECONDS = 120
+LOLI_IMAGE_REPO_ZIP_URL = 'https://github.com/nnlmc/waifu-gallery/raw/main/img.zip'
+LOLI_IMAGE_ZIP_MAX_BYTES = 200 * 1024 * 1024
+LOLI_IMAGE_TMP_NAME = 'loli_images.tmp'
+LOLI_IMAGE_DIR_NAME = 'loli_images'
 
 # --- 日志前缀 ---
 LOG_PREFIX = '[鸣潮今日老婆]'
 REPLY_PREFIX = '[今日老婆]'
+LOLI_REPLY_PREFIX = '[今日萝莉]'
+
+
+def _with_loli_reply_prefix(text: str) -> str:
+    if not text.strip():
+        return text
+    stripped = text.lstrip()
+    leading = text[: len(text) - len(stripped)]
+    if stripped.startswith(LOLI_REPLY_PREFIX):
+        return text
+    return f'{leading}{LOLI_REPLY_PREFIX}{stripped}'
+
+
+async def _send_loli_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
+    return await bot.send(_with_loli_reply_prefix(text), *args, **kwargs)
 
 
 def _reply_text(text: str) -> str:
@@ -225,6 +245,14 @@ def _custom_upload_role_map_path() -> Path:
 
 def _custom_upload_role_pile_root() -> Path:
     return _custom_upload_data_root() / 'custom_role_pile'
+
+
+def _loli_image_root() -> Path:
+    return _custom_upload_data_root() / LOLI_IMAGE_DIR_NAME
+
+
+def _loli_image_tmp_root() -> Path:
+    return _custom_upload_data_root() / LOLI_IMAGE_TMP_NAME
 
 
 def _writable_role_map_path() -> Path:
@@ -823,6 +851,125 @@ def _download_image_sync(url: str) -> bytes:
 
 async def _download_image(url: str) -> bytes:
     return await asyncio.to_thread(_download_image_sync, url)
+
+
+def _safe_loli_image_name(filename: str, index: int) -> str:
+    suffix = Path(filename).suffix.lower()
+    stem = re.sub(r'[^0-9A-Za-z._-]+', '_', Path(filename).stem).strip('._-')
+    if not stem:
+        stem = f'image_{index}'
+    return f'{stem}{suffix}'
+
+
+def _unique_loli_image_path(root: Path, filename: str) -> Path:
+    suffix = Path(filename).suffix.lower()
+    stem = Path(filename).stem
+    candidate = root / filename
+    counter = 1
+    while candidate.exists():
+        candidate = root / f'{stem}_{counter}{suffix}'
+        counter += 1
+    return candidate
+
+
+def _loli_image_paths() -> tuple[Path, ...]:
+    root = _loli_image_root()
+    if not root.is_dir():
+        return ()
+    images = [
+        path
+        for path in root.rglob('*')
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+    ]
+    return tuple(sorted(images, key=lambda path: str(path).lower()))
+
+
+def _download_loli_zip(zip_path: Path) -> None:
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    request = Request(LOLI_IMAGE_REPO_ZIP_URL, headers={'User-Agent': 'TodayWaifu/1.0'})
+    try:
+        with urlopen(request, timeout=60) as response:
+            total = 0
+            with zip_path.open('wb') as file:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > LOLI_IMAGE_ZIP_MAX_BYTES:
+                        raise RuntimeError('下载到的图片压缩包过大。')
+                    file.write(chunk)
+    except HTTPError as exc:
+        raise RuntimeError(f'下载萝莉图片失败，HTTP {exc.code}。') from exc
+    except URLError as exc:
+        raise RuntimeError(f'下载萝莉图片失败：{exc.reason}') from exc
+    except TimeoutError as exc:
+        raise RuntimeError('下载萝莉图片超时。') from exc
+
+    if not zip_path.is_file() or zip_path.stat().st_size <= 0:
+        raise RuntimeError('下载到的图片压缩包为空。')
+    if not zipfile.is_zipfile(zip_path):
+        raise RuntimeError('下载到的文件不是有效 zip 压缩包。')
+
+
+def _extract_loli_images(zip_path: Path) -> int:
+    tmp_root = _loli_image_tmp_root()
+    target_root = _loli_image_root()
+    if tmp_root.exists():
+        if tmp_root.is_dir():
+            shutil.rmtree(tmp_root)
+        else:
+            tmp_root.unlink()
+    tmp_root.mkdir(parents=True, exist_ok=True)
+
+    count = 0
+    total_size = 0
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            for index, info in enumerate(archive.infolist(), 1):
+                if info.is_dir():
+                    continue
+                filename = Path(info.filename.replace('\\', '/')).name
+                suffix = Path(filename).suffix.lower()
+                if suffix not in IMAGE_EXTENSIONS:
+                    continue
+                if info.file_size <= 0 or info.file_size > UPLOAD_IMAGE_MAX_BYTES:
+                    continue
+                total_size += info.file_size
+                if total_size > LOLI_IMAGE_ZIP_MAX_BYTES:
+                    raise RuntimeError('图片压缩包解压后体积过大。')
+                image_name = _safe_loli_image_name(filename, index)
+                image_path = _unique_loli_image_path(tmp_root, image_name)
+                with archive.open(info) as source:
+                    data = source.read(UPLOAD_IMAGE_MAX_BYTES + 1)
+                if not data or len(data) > UPLOAD_IMAGE_MAX_BYTES:
+                    continue
+                image_path.write_bytes(data)
+                count += 1
+    except zipfile.BadZipFile as exc:
+        raise RuntimeError('图片压缩包解压失败。') from exc
+
+    if count <= 0:
+        shutil.rmtree(tmp_root)
+        raise RuntimeError('图片压缩包里没有找到可用图片。')
+
+    if target_root.exists():
+        if target_root.is_dir():
+            shutil.rmtree(target_root)
+        else:
+            target_root.unlink()
+    tmp_root.rename(target_root)
+    return count
+
+
+def _download_and_extract_loli_images() -> int:
+    zip_path = _custom_upload_data_root() / 'loli_images.zip.tmp'
+    try:
+        _download_loli_zip(zip_path)
+        return _extract_loli_images(zip_path)
+    finally:
+        if zip_path.exists():
+            zip_path.unlink()
 
 
 async def _load_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
@@ -1478,6 +1625,28 @@ async def _send_record_image(
     await _send_role_image(bot, record.to_role(), record.image, text, user_id)
 
 
+async def _send_loli_image(bot: Bot, ev: Event) -> None:
+    images = _loli_image_paths()
+    if not images:
+        return await _send_loli_text(bot, '还没有萝莉图片，请先发送“下载萝莉图片”。')
+
+    image = random.choice(images)
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，发送图片: {image}')
+    await bot.send(MessageSegment.image(image))
+
+
+async def _send_download_loli_images(bot: Bot, ev: Event) -> None:
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发下载萝莉图片命令')
+    await _send_loli_text(bot, '开始下载萝莉图片，请稍等...')
+    try:
+        count = await asyncio.to_thread(_download_and_extract_loli_images)
+    except RuntimeError as exc:
+        logger.warning(f'{LOG_PREFIX} 下载萝莉图片失败: {exc}')
+        return await _send_loli_text(bot, str(exc))
+
+    await _send_loli_text(bot, f'萝莉图片下载完成，共导入 {count} 张。')
+
+
 async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = ''):
     if mode == 'husband' and _gallery_mode_enabled():
         return await _send_prefixed(bot, _husband_unavailable_message())
@@ -1788,6 +1957,16 @@ async def custom_wife_cancel_delete(bot: Bot, ev: Event):
 @upload_sv.on_regex(r'^老婆删除(?!图片|确认|取消)(?P<role>.+)$', block=True)
 async def custom_wife_delete_role(bot: Bot, ev: Event):
     await _send_request_delete_custom_wife_role(bot, ev)
+
+
+@upload_sv.on_fullmatch('下载萝莉图片', block=True)
+async def download_loli_images(bot: Bot, ev: Event):
+    await _send_download_loli_images(bot, ev)
+
+
+@sv.on_fullmatch('今日萝莉', block=True)
+async def daily_loli(bot: Bot, ev: Event):
+    await _send_loli_image(bot, ev)
 
 
 @sv.on_prefix(('今日老婆', '娶婆娘'), block=True)
