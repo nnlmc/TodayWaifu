@@ -50,6 +50,9 @@ async def _send_gift_wife(bot: Bot, ev: Event):
     target_existing = context['wives'].get(target_user_id)
     if _has_active_wife(target_existing):
         return await _send_prefixed(bot, '对方今天已经有老婆了，不需要你送哦~')
+    # 对方已有补偿老婆，不能再送（safe_wife 不能被送）
+    if isinstance(context.get('safe_wives', {}).get(target_user_id), dict):
+        return await _send_prefixed(bot, '对方已经有补偿老婆了，不需要你送哦~')
 
     logger.info(f'{LOG_PREFIX} 用户 {giver_id} 把老婆送给了 {target_user_id}')
     context['wives'][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)

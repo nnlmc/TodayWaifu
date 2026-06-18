@@ -986,6 +986,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('husbands', {})
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
+    context.setdefault('safe_wives', {})
     return context
 
 
@@ -1069,12 +1070,14 @@ def _wife_origin(raw: Any) -> str:
         return 'robbed'
     if raw.get('gifted_from'):
         return 'gifted'
+    if raw.get('safe'):
+        return 'safe'
     return 'self'
 
 
 def _is_secondhand_wife(raw: Any) -> bool:
-    """二手老婆 = 抢来的或别人送的（到手即终结，不能再流转）。"""
-    return _wife_origin(raw) in ('robbed', 'gifted')
+    """二手老婆 = 抢来的/别人送的/补偿抽的（到手即终结，不能再流转）。"""
+    return _wife_origin(raw) in ('robbed', 'gifted', 'safe')
 
 
 def _has_active_wife(raw: Any) -> bool:

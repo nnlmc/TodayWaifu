@@ -95,18 +95,20 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
     data = _load_wife_data()
     context = _get_today_context(data, ev)
     wives = context.get(bucket, {})
-    if not isinstance(wives, dict) or not wives:
-        return f'今天本群还没有人抽{title}。', []
+    if not isinstance(wives, dict):
+        wives = {}
 
     group_display_names = await _load_group_display_names(ev)
     data_changed = False
     items: list[tuple[int, str, str]] = []
+    seen_users: set[str] = set()
     for user_id, raw_record in wives.items():
         if not isinstance(raw_record, dict):
             continue
         record = _record_from_dict(raw_record)
         if record is None:
             continue
+        seen_users.add(user_id)
         display_name = _valid_display_name(raw_record.get('display_name'), user_id)
         if not display_name:
             display_name = group_display_names.get(str(user_id), '')
@@ -123,6 +125,9 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
         except (TypeError, ValueError):
             order = 0
         state = _wife_state(raw_record)
+        # 被抢但有补偿老婆的，留给 safe_wives 循环显示补偿名字，不显示"被抢走了~"
+        if state == 'lost_stolen' and isinstance(context.get('safe_wives', {}).get(user_id), dict):
+            continue
         if state == 'lost_stolen':
             wife_name = '被抢走了~'
         elif state == 'lost_gifted':
@@ -131,6 +136,34 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             wife_name = record.name
 
         items.append((order, display_name, wife_name))
+
+    # 补偿老婆（safe_wives）：被抢后重抽的补偿记录，显示"(补)"后缀
+    if mode == 'wife':
+        safe_wives = context.get('safe_wives', {})
+        if isinstance(safe_wives, dict):
+            for user_id, raw_record in safe_wives.items():
+                if not isinstance(raw_record, dict):
+                    continue
+                record = _record_from_dict(raw_record)
+                if record is None:
+                    continue
+                seen_users.add(user_id)
+                display_name = _valid_display_name(raw_record.get('display_name'), user_id)
+                if not display_name:
+                    display_name = group_display_names.get(str(user_id), '')
+                    if display_name:
+                        raw_record['display_name'] = display_name
+                        raw_record['display_name_source'] = 'coreuser'
+                        raw_record['display_name_updated_at'] = int(time.time())
+                        data_changed = True
+                if not display_name:
+                    display_name = str(user_id)
+                updated_at = raw_record.get('updated_at')
+                try:
+                    order = int(updated_at)
+                except (TypeError, ValueError):
+                    order = 0
+                items.append((order, display_name, record.name + '(补)'))
 
     if not items:
         return f'今天本群还没有可用的{title}记录。', []
@@ -187,13 +220,41 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         user_key = _user_key(ev)
         current_record = context['wives'].get(user_key)
 
-        # 离手即结算：被抢走 / 送出去后当天锁死，不再分配新角色
+        # 离手即结算：被抢走后可补偿重抽一次（safe_wife），送出去仍锁死
         state = _wife_state(current_record)
         if state == 'lost_stolen':
+            # 已有补偿老婆的直接展示
+            safe_record = context['safe_wives'].get(user_key)
+            if isinstance(safe_record, dict):
+                safe_wife = _record_from_dict(safe_record)
+                if safe_wife is not None:
+                    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 展示已有的补偿老婆: {safe_wife.name}')
+                    return await _send_record_image(bot, safe_wife, mode, ev.user_id)
+
+            # 未抽过补偿老婆：抽一个，写入 safe_wives
             wife_name = current_record.get('name', '老婆')
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
-            logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆已被抢，拒绝分配新角色')
-            return await _send_prefixed(bot,f'你的{wife_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
+            candidates, error = await _load_candidates()
+            if error or not candidates:
+                return await _send_prefixed(bot, error or '没有找到可用角色。')
+            candidates = _filter_by_mode(candidates, mode)
+            if not candidates:
+                return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
+            rng = _daily_rng(ev, user_key, f'{mode}_safe')
+            role = rng.choice(candidates)
+            image = rng.choice(role.images)
+            safe_wife = WifeRecord.from_role(role, image)
+            context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
+            context['safe_wives'][user_key]['safe'] = True
+            _save_wife_data(data)
+            logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆被抢，补偿抽取: {safe_wife.name}')
+            await _send_prefixed(
+                bot,
+                f'你的{wife_name}已经被{stolen_by_name}抢走了…\n'
+                f'但你迎来了新的{title}{safe_wife.name}！\n'
+                f'（补偿老婆不能被抢也不能送哦）',
+            )
+            return await _send_record_image(bot, safe_wife, mode, ev.user_id)
         if state == 'lost_gifted':
             wife_name = current_record.get('name', '老婆')
             gifted_to_name = current_record.get('gifted_to_name') or current_record.get('gifted_to')
