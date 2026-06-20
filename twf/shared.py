@@ -1071,6 +1071,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
+    context.setdefault('owner_marriage', None)
     return context
 
 

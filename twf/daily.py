@@ -324,12 +324,34 @@ async def _send_group_member_wife(bot: Bot, ev: Event):
     await _send_local_image(bot, member.avatar, '本地群友头像文件不存在，请稍后重试。', text, ev.user_id)
 
 
+async def _send_existing_owner_marriage(bot: Bot, ev: Event, existing: dict[str, Any], user_key: str) -> None:
+    if str(existing.get('user_id')) == user_key:
+        member = MemberCandidate(
+            str(existing.get('owner_name') or ''),
+            str(existing.get('owner_user_id') or existing.get('user_id') or ''),
+            str(existing.get('avatar') or ''),
+        )
+        text = _build_member_text(member, 'marry_owner') if bool(_cfg('DailyWifeSendText')) else None
+        await _send_local_image(bot, member.avatar, '本地群主头像文件不存在，请稍后重试。', text, ev.user_id)
+        return
+    owner_name = existing.get('owner_name') or '群主'
+    marrier_name = existing.get('display_name') or existing.get('user_id')
+    await _send_prefixed(bot, f'本群的{owner_name}今天已经被{marrier_name}娶走了，明天再来吧。')
+
+
 async def _send_group_owner_wife(bot: Bot, ev: Event):
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了娶群主命令')
     if not _marry_owner_enabled():
         return await _send_prefixed(bot, '娶群主功能当前已关闭。')
     if not ev.group_id:
         return await _send_prefixed(bot, '这个命令只能在群聊里使用。')
+
+    user_key = _user_key(ev)
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+    existing = context.get('owner_marriage')
+    if isinstance(existing, dict) and existing.get('user_id'):
+        return await _send_existing_owner_marriage(bot, ev, existing, user_key)
 
     owner = _get_recorded_owner(ev)
     if owner is None:
@@ -338,6 +360,23 @@ async def _send_group_owner_wife(bot: Bot, ev: Event):
     resolved = await _resolve_member_candidate_avatar(owner)
     if resolved is None:
         return await _send_prefixed(bot, '群主头像获取失败，请稍后重试。')
+
+    # 写入阶段：头像解析含 await，重新加载并二次校验，避免并发下两人都"娶到"群主
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+    existing = context.get('owner_marriage')
+    if isinstance(existing, dict) and existing.get('user_id'):
+        return await _send_existing_owner_marriage(bot, ev, existing, user_key)
+
+    context['owner_marriage'] = {
+        'user_id': user_key,
+        'display_name': _user_display_name(ev),
+        'owner_name': resolved.name,
+        'owner_user_id': resolved.user_id,
+        'avatar': resolved.avatar,
+        'updated_at': int(time.time()),
+    }
+    _save_wife_data(data)
 
     logger.info(
         f'{LOG_PREFIX} marry_owner user={ev.user_id} group={ev.group_id} '
