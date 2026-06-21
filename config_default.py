@@ -12,8 +12,9 @@ from gsuid_core.utils.plugins_config.models import (
 CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeImageSource': GsStrConfig(
         '图片数据源',
-        '填 gallery 使用图库接口；填 local 使用本地图片目录读取',
+        '选择 local 使用本地图片目录；选择 gallery 使用远程图库接口',
         'local',
+        options=['local', 'gallery'],
     ),
     'DailyWifeCustomRolePilePath': GsStrConfig(
         '本地角色图片目录',

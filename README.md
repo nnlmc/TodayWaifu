@@ -124,7 +124,7 @@ gsuid_core/data/TodayWaifu/
 
 ## 鸣潮角色图片
 
-角色图片有两种数据源，由控制台配置 `DailyWifeImageSource` 决定：
+角色图片有两种数据源，由控制台配置 `DailyWifeImageSource` 下拉选择决定：
 
 - `local`：读取本地 XWUID 图片资源。
 - `gallery`：读取 XWUID 图库接口并下载图片发送。
@@ -164,7 +164,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| `DailyWifeImageSource` | `local` | 图片数据源；`local` 本地资源，`gallery` 图库接口 |
+| `DailyWifeImageSource` | `local` | 图片数据源，下拉选择；`local` 本地资源，`gallery` 远程图库接口 |
 | `DailyWifeCustomRolePilePath` | 空 | 自定义本地角色图片目录，本地模式生效 |
 | `DailyWifeRoleMapPath` | 空 | 自定义角色 ID 对照表，本地模式生效 |
 | `DailyWifeGalleryApiUrl` | `https://img.xlinxc.cn/api/xwuid/roles` | 图库接口地址，图库模式生效 |
