@@ -523,6 +523,33 @@ def _load_mode_role_map(mode: str = 'wife') -> dict[str, str]:
     return _load_role_map(role_map_path) if role_map_path else {}
 
 
+def _rank_allowed_wife_names() -> set[str]:
+    names: set[str] = set()
+    try:
+        role_map = _load_mode_role_map('wife')
+        upload_role_map_path = _custom_upload_role_map_path()
+        if upload_role_map_path.is_file():
+            role_map.update(_load_role_map(upload_role_map_path))
+        names = {
+            _normalize_role_name(role_name)
+            for role_name in role_map.values()
+            if role_name and not _is_excluded_role(role_name)
+        }
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} 加载总排行角色白名单失败: {exc}')
+    return names
+
+
+def _is_rankable_wife_record(raw_record: dict[str, Any], allowed_names: set[str]) -> bool:
+    if str(raw_record.get('record_type') or 'role') != 'role':
+        return False
+    role_ids = {str(item).strip() for item in raw_record.get('role_ids') or ()}
+    if '群友' in role_ids:
+        return False
+    wife_name = _normalize_role_name(str(raw_record.get('name') or ''))
+    return bool(wife_name and wife_name in allowed_names)
+
+
 def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
     title = _role_map_title(role_mode)
@@ -1213,6 +1240,11 @@ def _total_wife_rank_records() -> tuple[int, int, list[dict[str, Any]]]:
     if not isinstance(days, dict):
         return 0, 0, []
 
+    allowed_names = _rank_allowed_wife_names()
+    if not allowed_names:
+        logger.warning(f'{LOG_PREFIX} 总排行角色白名单为空，跳过统计，避免上传非角色记录')
+        return 0, 0, []
+
     active_days: set[str] = set()
     stats: dict[tuple[str, str, str], dict[str, int | str]] = {}
 
@@ -1232,6 +1264,8 @@ def _total_wife_rank_records() -> tuple[int, int, list[dict[str, Any]]]:
                     continue
                 for raw_record in bucket.values():
                     if not isinstance(raw_record, dict):
+                        continue
+                    if not _is_rankable_wife_record(raw_record, allowed_names):
                         continue
                     wife_name = str(raw_record.get('name') or '').strip()
                     if not wife_name:
