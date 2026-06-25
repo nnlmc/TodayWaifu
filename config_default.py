@@ -53,7 +53,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeCloudRankEnabled': GsBoolConfig(
         '启用云端总排行',
-        '开启后查询「今日老婆总排行」时会把本地历史统计同步到图库服务，并返回云端汇总排行；未配置图库账号密码时自动回退本地排行',
+        '开启后图库模式每次成功发送图库图片都会后台同步本地统计；查询「今日老婆总排行」时会同步并返回云端汇总排行；未配置图库账号密码时自动回退本地排行',
         True,
     ),
     'DailyWifeCloudRankApiUrl': GsStrConfig(

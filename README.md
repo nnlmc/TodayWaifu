@@ -24,6 +24,7 @@
 - `老婆更新记录`：实时获取 GitHub 更新记录，通过 HTML 渲染成图片发送。
 - `老婆列表` / `老公列表`：查看本群当天记录。
 - `今日老婆总排行`：合并转发展示老婆被娶次数排行；配置图库账号后会同步本地记录并返回云端总排行。
+- 云端总排行：图库模式下每次成功发送图库图片都会后台刷新本地统计快照；本地模式会在查询总排行时同步。
 - `今日老婆帮助`：发送图文帮助卡片，并注册到 GSCore「core帮助」一览页。
 - 主人命令：创建 / 上传 / 查看 / 删除自定义老婆图片；下载 / 删除萝莉图库。
 
@@ -176,7 +177,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | `DailyWifeGalleryApiUrl` | `https://img.xlinxc.cn/api/xwuid/roles` | 图库接口地址，图库模式生效 |
 | `DailyWifeGalleryUsername` | 空 | 图库账号 |
 | `DailyWifeGalleryPassword` | 空 | 图库密码 |
-| `DailyWifeCloudRankEnabled` | 开启 | 查询总排行时是否同步本地记录并返回云端总排行；未配置图库账号密码时自动回退本地排行 |
+| `DailyWifeCloudRankEnabled` | 开启 | 图库模式发图后后台同步本地统计；查询总排行时同步并返回云端总排行；未配置图库账号密码时自动回退本地排行 |
 | `DailyWifeCloudRankApiUrl` | 空 | 云端总排行接口，留空时自动从图库接口地址推导 |
 | `DailyWifeSendText` | 开启 | 发图片前是否带文字 |
 | `DailyWifeReplyPrefixEnabled` | 开启 | 回复是否带「[今日老婆]」前缀 |
