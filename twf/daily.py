@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .shared import *  # noqa: F403
+from .rank_render import build_total_wife_rank_image
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
@@ -493,6 +494,26 @@ def _total_wife_rank_text(
     return '\n'.join(lines)
 
 
+async def _send_rank_image_or_text(
+    bot: Bot,
+    day_count: int,
+    total_count: int,
+    items: list[tuple[int, int, str]],
+    source_label: str,
+    note: str = '',
+) -> None:
+    try:
+        image = await build_total_wife_rank_image(day_count, total_count, items, source_label, note)
+    except RuntimeError as exc:
+        logger.warning(f'{LOG_PREFIX} 总排行图片渲染失败，回退文字: {exc}')
+        await _send_prefixed(
+            bot,
+            MessageSegment.node([_total_wife_rank_text(day_count, total_count, items, source_label, note)]),
+        )
+        return
+    await _send_prefixed(bot, MessageSegment.image(image))
+
+
 async def _send_total_wife_rank(bot: Bot, ev: Event) -> None:
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 请求了今日老婆总排行')
     local_day_count, local_total_count, records = _total_wife_rank_records()
@@ -502,26 +523,15 @@ async def _send_total_wife_rank(bot: Bot, ev: Event) -> None:
         try:
             day_count, total_count, items, source_count = await _fetch_cloud_total_wife_rank(records)
             note = f'已同步本地记录，当前汇总 {source_count} 个数据源。' if source_count else '已同步本地记录。'
-            await _send_prefixed(
-                bot,
-                MessageSegment.node([_total_wife_rank_text(day_count, total_count, items, '云端', note)]),
-            )
+            await _send_rank_image_or_text(bot, day_count, total_count, items, '云端', note)
             return
         except Exception as exc:
             logger.warning(f'{LOG_PREFIX} 同步云端总排行失败，回退本地排行: {exc}')
             note = '云端同步失败，以下为本地排行。'
-            await _send_prefixed(
-                bot,
-                MessageSegment.node([
-                    _total_wife_rank_text(local_day_count, local_total_count, local_items, '本地', note)
-                ]),
-            )
+            await _send_rank_image_or_text(bot, local_day_count, local_total_count, local_items, '本地', note)
             return
 
-    await _send_prefixed(
-        bot,
-        MessageSegment.node([_total_wife_rank_text(local_day_count, local_total_count, local_items, '本地')]),
-    )
+    await _send_rank_image_or_text(bot, local_day_count, local_total_count, local_items, '本地')
 
 
 
