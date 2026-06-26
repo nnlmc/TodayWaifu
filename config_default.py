@@ -12,7 +12,7 @@ from gsuid_core.utils.plugins_config.models import (
 CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeImageSource': GsStrConfig(
         '图片数据源',
-        '选择 local 使用本地图片目录；选择 gallery 使用远程图库接口',
+        '选择 local 使用本地图片目录；选择 gallery 使用远程图库接口。图库图片可能存在内容风险，请自行决定是否启用；使用风险自行承担，插件作者不承担责任',
         'local',
         options=['local', 'gallery'],
     ),
@@ -38,17 +38,17 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeGalleryApiUrl': GsStrConfig(
         '图库接口地址',
-        'XWUID 图库角色立绘接口地址，默认使用 https://img.xlinxc.cn/api/xwuid/roles',
+        'XWUID 图库角色立绘接口地址，默认使用 https://img.xlinxc.cn/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
         'https://img.xlinxc.cn/api/xwuid/roles',
     ),
     'DailyWifeGalleryUsername': GsStrConfig(
         '图库账号',
-        '访问 XWUID 图库接口和图片所需的账号',
+        '访问 XWUID 图库接口和图片所需的账号。图库内容可能存在风险，请自行决定是否使用',
         '',
     ),
     'DailyWifeGalleryPassword': GsStrConfig(
         '图库密码',
-        '访问 XWUID 图库接口和图片所需的密码',
+        '访问 XWUID 图库接口和图片所需的密码。图库使用风险自行承担，插件作者不承担责任',
         '',
     ),
     'DailyWifeCloudRankEnabled': GsBoolConfig(
