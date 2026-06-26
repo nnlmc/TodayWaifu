@@ -25,7 +25,7 @@
 > git clone https://cnb.cool/nnlmc/TodayWaifu.git
 > ```
 >
-> 插件交流、图库账号密码获取请加群：`798949533`
+> 插件交流、图库账号密码获取请加群：[798949533](https://qm.qq.com/q/ejzCUfJ5le)
 
 ## 丨功能一览
 
