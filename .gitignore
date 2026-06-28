@@ -12,3 +12,6 @@ help_preview.html
 __rank_preview.html
 __rank_preview.png
 .playwright-cli/
+
+# 本地文档 / 项目主页（不入库）
+index.html
