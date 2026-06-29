@@ -25,9 +25,7 @@ def _build_member_text(member: MemberCandidate, mode: str = 'daily') -> str:
         template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}')
     else:
         template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天的老婆是{name}')
-    lines = [template.format(name=member.name, user_id=member.user_id)]
-    lines.append(f'QQ：{member.user_id}')
-    return '\n'.join(lines)
+    return template.format(name=member.name, user_id=member.user_id)
 
 
 def _record_text(record: WifeRecord, mode: str = 'wife') -> str:
